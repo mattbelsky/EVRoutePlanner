@@ -1,15 +1,19 @@
 package ev_route_planner.controllers;
 
+import ev_route_planner.exceptions.ControllerAdviceClass;
+import ev_route_planner.model.GeneralResponse;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import ev_route_planner.services.OpenChargeMapService;
 
 import java.io.IOException;
 
+/**
+ * This controller allows the user to get a list of EV charging sites from one specified location.
+ * It currently allows querying by country, by latitude and longitude, as
+ * well as by current location which the application will detect.
+ */
 @RestController
 @RequestMapping("/openchargemap")
 public class OpenChargeMapController {
@@ -17,17 +21,35 @@ public class OpenChargeMapController {
     @Autowired
     OpenChargeMapService openChargeMapService;
 
-    // Searches by country
+    @Autowired
+    ControllerAdviceClass controllerAdviceClass;
+
+    /**
+     * Queries by country
+     * @param countryCode ISO country code (i.e. US, CA, ID, UK)
+     * @param maxResults the maximum number of results to return
+     * @return an array objects containing details about each charging site
+     */
     @RequestMapping("/bycountry")
-    public ChargingSite[] searchByCountry(@RequestParam(value = "q") String countryCode,
+    public GeneralResponse searchByCountry(@RequestParam(value = "q") String countryCode,
                                           @RequestParam(value = "maxresults", defaultValue = "50") int maxResults) {
         ChargingSite[] chargingSites = openChargeMapService.searchByCountry(countryCode, maxResults);
-        return chargingSites;
+        GeneralResponse response = new GeneralResponse(chargingSites);
+        return response;
     }
 
-    // Searches by latitude & longitude & distance in miles or km from it
+    /**
+     * Searches by latitude & longitude & distance in miles or km from it.
+     * @param latitude
+     * @param longitude
+     * @param distance radius to search
+     * @param distanceUnit 1 = km, 2 = mi
+     * @param levelID charging levels (1 = home outlet, 2 & 3 = faster charging)
+     * @param maxResults the maximum number of results to return
+     * @return an array objects containing details about each charging site
+     */
     @RequestMapping("/bylatlong")
-    public ChargingSite[] searchByLatLong(@RequestParam(value = "latitude") double latitude,
+    public GeneralResponse searchByLatLong(@RequestParam(value = "latitude") double latitude,
                                           @RequestParam(value = "longitude") double longitude,
                                           @RequestParam(value = "distance") double distance,
                                           @RequestParam(value = "distanceunit") int distanceUnit,
@@ -35,14 +57,20 @@ public class OpenChargeMapController {
                                           @RequestParam(value = "maxresults") int maxResults) {
         ChargingSite[] chargingSites = openChargeMapService.searchByLatLong(latitude, longitude, distance, distanceUnit,
                 levelID, maxResults);
-        return chargingSites;
+        GeneralResponse response = new GeneralResponse(chargingSites);
+        return response;
     }
 
-    // Gets user's approximate latitude and longitude and shows charging stations within a predefined radius
-    // Although the request in the service class is using the postForObject() method, this is a GET request apparently.
+    /**
+     * Gets user's approximate latitude and longitude and shows charging stations within a predefined radius.
+     * Although the request in the service class is using the postForObject() method, this is a GET request apparently.
+     * @return an array objects containing details about each charging site
+     * @throws IOException
+     */
     @RequestMapping(method = RequestMethod.GET, value = "/nearme")
-    public ChargingSite[] searchNearMe() throws IOException {
+    public GeneralResponse searchNearMe() throws IOException {
         ChargingSite[] sitesNearMe = openChargeMapService.searchNearMe();
-        return sitesNearMe;
+        GeneralResponse response = new GeneralResponse(sitesNearMe);
+        return response;
     }
 }

@@ -1,6 +1,5 @@
 package ev_route_planner.services;
 
-import ev_route_planner.mappers.OpenChargeMapMapper;
 import ev_route_planner.mappers.RoutePlannerMapper;
 import ev_route_planner.model.geolocation.Geolocation;
 import ev_route_planner.model.geolocation.WifiAccessPoints;
@@ -17,9 +16,6 @@ public class OpenChargeMapService {
 
     @Autowired
     RestTemplate restTemplate;
-
-    @Autowired
-    OpenChargeMapMapper openChargeMapMapper;
 
     @Autowired
     RoutePlannerMapper routePlannerMapper;
