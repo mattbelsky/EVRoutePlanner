@@ -26,3 +26,6 @@ public class Application /*extends SpringBootServletInitializer*/ {
 //    }
 
 }
+
+// Ryan: all in all looks like great work Matt! I made some comments throughout and tried to answer all of your
+// in-line questions. The code needs to be cleaned up a bit, and polished, but it's very work. A fantastic start.

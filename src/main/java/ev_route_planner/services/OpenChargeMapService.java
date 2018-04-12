@@ -9,7 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+
+// Ryan: generally speaking this class needs a bit of work. seems like a work in progress. especially compared
+// to your other classes and code that look rock solid
 
 @Service
 public class OpenChargeMapService {
@@ -22,46 +28,46 @@ public class OpenChargeMapService {
 
     // Scans for available wifi networks and captures their BSSID, channel, and signal information.
     // Apparently this method is completely unnecessary. No idea why though.
-//    public WifiAccessPoints[] getWifiNetworks() throws IOException {
-//        // The system command to execute
-//        String command = "nmcli -f BSSID,CHAN,SIGNAL dev wifi list";
-//        // Assigns a reference to the Process being executed
-//        Process p = Runtime.getRuntime().exec(command);
-//        // Gets the input stream of p and wraps it with a buffered reader
-//        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//
-//        // ArrayLists containing details on the available wifi networks
-//        ArrayList<String> bssid = new ArrayList<String>();
-//        ArrayList<String> signal = new ArrayList<String>();
-//        ArrayList<String> channel = new ArrayList<String>();
-//        String line;
-//
-//        // Sets the values of the ArrayLists
-//        try {
-//            while (r.readLine() != null) {
-//                line = r.readLine();
-//                bssid.add(line.substring(0, 17));
-//                signal.add(line.substring(25, 27));
-//                channel.add(line.substring(19, 21));
-//            }
-//        }
-//        catch (NullPointerException e) {
-//            // Do nothing.
-//        }
-//
-//        // Creates an array of objects containing data on the wifi networks
-//        WifiAccessPoints[] wifiAccessPoints = new WifiAccessPoints[bssid.size()];
-//
-//        // Sets the instance variables of each object in this array with the values from the ArrayLists
-//        for (int i = 0; i < wifiAccessPoints.length; i++) {
-//            wifiAccessPoints[i] = new WifiAccessPoints();
-//            wifiAccessPoints[i].setMacAddress(bssid.get(i));
-//            wifiAccessPoints[i].setSignalStrength(Integer.parseInt(signal.get(i).trim()));
-//            wifiAccessPoints[i].setChannel(Integer.parseInt(channel.get(i).trim()));
-//        }
-//
-//        return wifiAccessPoints;
-//    }
+    public WifiAccessPoints[] getWifiNetworks() throws IOException {
+        // The system command to execute
+        String command = "nmcli -f BSSID,CHAN,SIGNAL dev wifi list";
+        // Assigns a reference to the Process being executed
+        Process p = Runtime.getRuntime().exec(command);
+        // Gets the input stream of p and wraps it with a buffered reader
+        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+        // ArrayLists containing details on the available wifi networks
+        ArrayList<String> bssid = new ArrayList<String>();
+        ArrayList<String> signal = new ArrayList<String>();
+        ArrayList<String> channel = new ArrayList<String>();
+        String line;
+
+        // Sets the values of the ArrayLists
+        try {
+            while (r.readLine() != null) {
+                line = r.readLine();
+                bssid.add(line.substring(0, 17));
+                signal.add(line.substring(25, 27));
+                channel.add(line.substring(19, 21));
+            }
+        }
+        catch (NullPointerException e) {
+            // Do nothing.
+        }
+
+        // Creates an array of objects containing data on the wifi networks
+        WifiAccessPoints[] wifiAccessPoints = new WifiAccessPoints[bssid.size()];
+
+        // Sets the instance variables of each object in this array with the values from the ArrayLists
+        for (int i = 0; i < wifiAccessPoints.length; i++) {
+            wifiAccessPoints[i] = new WifiAccessPoints();
+            wifiAccessPoints[i].setMacAddress(bssid.get(i));
+            wifiAccessPoints[i].setSignalStrength(Integer.parseInt(signal.get(i).trim()));
+            wifiAccessPoints[i].setChannel(Integer.parseInt(channel.get(i).trim()));
+        }
+
+        return wifiAccessPoints;
+    }
 
     // Calls the Google Geolocation API which returns the user's approximate location based on detected wifi networks.
     // Although I wrote it, this method works through some sorcery I don't understand.
@@ -73,14 +79,16 @@ public class OpenChargeMapService {
 
         // The array of WifiAccessPoint objects containing data on available wifi networks is given an acceptable format
         // for a postForObject() request.
-        LinkedMultiValueMap<String, WifiAccessPoints[]> request = new LinkedMultiValueMap<>();
-//        WifiAccessPoints[] wifiAccessPoints = getWifiNetworks();
+        LinkedMultiValueMap<String, WifiAccessPoints> request = new LinkedMultiValueMap<>();
+        WifiAccessPoints[] wifiAccessPoints = getWifiNetworks();
 
         /*  Why does the code below cause an error?? And how does the above work without a WifiAccessPoints[]
             array being passed?   */
-//        for (int i = 0; i < wifiAccessPoints.length; i++) {
-//            request.add("wifiAccessPoints", wifiAccessPoints[i]);
-//        }
+        // Ryan: this will cause issues when all the keys are the same in the Key Value Map
+        // the error was because the Map declaration above wanted a WifiAccessPoints[] and not a WifiAccessPoints
+        for (int i = 0; i < wifiAccessPoints.length; i++) {
+            request.add("wifiAccessPoints", wifiAccessPoints[i]);
+        }
 
         Geolocation deviceLocation = restTemplate.postForObject(url, request, Geolocation.class);
 
@@ -119,6 +127,7 @@ public class OpenChargeMapService {
 
         // The array to return
         // distance, distanceUnit, and maxResults are predefined here
+        // Ryan: would be cool if lat long were dynamic - another challenge later.. :)
         ChargingSite[] sitesNearUser = searchByLatLong(latitude, longitude, 1500, 2, 2, 100);
         return sitesNearUser;
 

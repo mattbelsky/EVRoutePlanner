@@ -6,7 +6,9 @@ import ev_route_planner.model.user.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.UUID;
 
 @Service
@@ -20,6 +22,10 @@ public class UserService {
         User user = new User();
         user.setAlias(alias);
         user.setApiKey(apiKey);
+
+        // Ryan: there's a possibility of an exception here, should the network be down or the DB be offline
+        // would be good to be prepared for that by having this method throw an exception that can be caught
+        // by @ControllerAdvice
         userMapper.addNewUser(user);
         return userMapper.findByAlias(alias);
     }
@@ -32,6 +38,7 @@ public class UserService {
         } catch (NullPointerException e) {
             userExists = false;
         }
+        // Ryan: may also want to catch "Exception" here in a second catch just in case, same reason as above
         return userExists;
     }
 
@@ -52,6 +59,7 @@ public class UserService {
             if (calls.length == 0) throw new NullPointerException(); // Added this as no NullPointException is thrown.
         } catch (NullPointerException e) {
             // Do nothing.
+            // Ryan: why are you throwing this exception and then not doing anything? not sure I follow.
         }
         int countCallsPerMinute = 0;
         int countCallsPerDay = 0;
@@ -59,6 +67,12 @@ public class UserService {
         /*  QUESTION: While it seems simpler to get date and time from localDateTimeObj.toString().substring(), is it
             better/safer to get it from localDateTimeObj.getMonth(), .getMin(), etc. even though it's more verbose?
          */
+
+        // Ryan: I think either way is fine.
+        // Ryan: that said, I think you might want to consider just querying the DB and use the count() SQL function
+        // to count the calls they've made today, or made this minute. Know what I mean?
+        // For instance, "SELECT count(id) FROM `ev-route-planner`.`api-calls` WHERE apiKey = #{apiKey} AND date > 2018-04-12"
+        // or something along those lines. Know what I mean? If you can work that out it will be much simpler.
         for (ApiCall call : calls) {
             String currentDate = currentDateTime.substring(0, 10);
             String callDate = call.getDateTime().substring(0, 10);
@@ -76,6 +90,11 @@ public class UserService {
 
     // Adds a new API call with key and time to the database.
     public ApiCall addApiCall(String apiKey) {
+        // Ryan: if the varchar can't be compared with ">" you may need to switch column to DateTime
+//        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+//        Date now = new Date();
+//        sdf.format(now);
+
         String currentDateTime = LocalDateTime.now().toString();
         userMapper.addApiCall(apiKey, currentDateTime);
         return userMapper.getCallByKeyAndDateTime(apiKey, currentDateTime);
@@ -86,6 +105,9 @@ public class UserService {
         boolean keyExists;
         try {
             keyExists = (userMapper.findByApiKey(apiKey) != null);
+            // Ryan: instead of catching NullPointerException in these various cases - as above in this class
+            // I'd maybe just catch Exception - as it will catch any exception that occurs - and you can still set
+            // keyExists, for instance, to false
         } catch (NullPointerException e) {
             keyExists = false;
         }

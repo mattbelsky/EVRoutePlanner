@@ -51,10 +51,20 @@ public class RoutePlannerController {
                                        @RequestParam(value = "endlng") double endLng,
                                        @RequestParam(value = "apikey") String apiKey)
             throws RouteNotFoundException, KeyDoesNotExistException, RateLimitException {
-        if (!userService.keyExists(apiKey)) throw new KeyDoesNotExistException();
-        if (userService.apiCallsExceeded(apiKey)) throw new RateLimitException();
+
+        // Ryan: nice work throughout this class - just FYI, the next step with the roll-your-own API key would be to
+        // add it to an interceptor that gets managed by Spring Security - so you don't have to manually check the key in
+        // every controller method
+        if (!userService.keyExists(apiKey))
+            throw new KeyDoesNotExistException();
+
+        if (userService.apiCallsExceeded(apiKey))
+            throw new RateLimitException();
+
         ArrayList<ChargingSite> sites = routePlannerService.findRoute(startLat, startLng, endLat, endLng);
+
         GeneralResponse response = new GeneralResponse(sites);
+
         userService.addApiCall(apiKey);
         return response;
     }

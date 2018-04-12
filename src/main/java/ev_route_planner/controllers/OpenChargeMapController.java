@@ -14,6 +14,9 @@ import java.io.IOException;
  * It currently allows querying by country, by latitude and longitude, as
  * well as by current location which the application will detect.
  */
+
+// Ryan: really nice work bud!
+
 @RestController
 @RequestMapping("/openchargemap")
 public class OpenChargeMapController {

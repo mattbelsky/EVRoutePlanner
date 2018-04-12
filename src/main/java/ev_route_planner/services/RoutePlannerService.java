@@ -50,6 +50,9 @@ public class RoutePlannerService {
                 Parameters not entered properly (ie incomplete, not doubles) - HOW TO HANDLE?
                 No route exists - HANDLED
          */
+        // Ryan: you could have a method that acts as a "data sanity" check to make sure that all the required variables needed
+        // are present and in good form. This is a pretty common thing. If the sanity check fails, throw an exception to the advice.
+
         String key = routePlannerMapper.getKey(2);
         String query = "https://maps.googleapis.com/maps/api/directions/json?" +
                 "origin=" + startLat + "," + startLng +
@@ -94,6 +97,9 @@ public class RoutePlannerService {
         // the ArrayList that will be returned
         ArrayList<ChargingSite> sitesAlongRoute = new ArrayList();
 
+        // Ryan: what's the complexity of the two algorithms below? Is there a way you could make it more efficient?
+        // I could see this method taking a very long time to complete if the collections are even slightly large
+
         // Adds each element of each array of charging site objects to the ArrayList that will be returned.
         for (ChargingSite[] sitesNearCoords : sitesAlongRouteRepeatingElements) {
             for (ChargingSite site : sitesNearCoords) {
@@ -126,6 +132,7 @@ public class RoutePlannerService {
         int index = 0, len = encoded.length();
         int lat = 0, lng = 0;
 
+        // Ryan: nice work! Did you figure this out? Or find it somewhere? Do you know what's happening here?
         while (index < len) {
             int b, shift = 0, result = 0;
             do {

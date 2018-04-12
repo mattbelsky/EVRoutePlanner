@@ -12,6 +12,8 @@ public class UserController {
     @Autowired
     UserService userService;
 
+    // Ryan: typically, in a RESTful API, we don't want any verbs like "GET", "POST", "ADD", "CREATE" etc in our URLs
+    // since we can use HTTP methods GET, PUT, POST, DELETE etc - it keeps our endpoints cleaner, easier to predict and work with
     @GetMapping("/getakey")
     public User registerUser(@RequestParam(value = "alias") String alias) throws UserExistsException {
         if (userService.userExists(alias)) throw new UserExistsException();
