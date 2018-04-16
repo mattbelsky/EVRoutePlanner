@@ -7,7 +7,7 @@
     <artifactId>EVRoutePlanner</artifactId>
     <version>0.1.0</version>
     <!--Add this. Packages application as a .war file.-->
-    <!--<packaging>war</packaging>-->
+    <packaging>war</packaging>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -41,11 +41,17 @@
             <version>8.0.8-dmr</version>
         </dependency>
         <!--To deploy to Tomcat, uncomment this dependency.-->
-        <!--<dependency>-->
-        <!--<groupId>org.springframework.boot</groupId>-->
-        <!--<artifactId>spring-boot-starter-tomcat</artifactId>-->
-        <!--<scope>provided</scope>-->
-        <!--</dependency>-->
+        <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-tomcat</artifactId>
+        <scope>provided</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-ses -->
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-ses</artifactId>
+            <version>1.11.313</version>
+        </dependency>
     </dependencies>
 
     <properties>
