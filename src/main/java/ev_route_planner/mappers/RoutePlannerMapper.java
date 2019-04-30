@@ -6,8 +6,6 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface RoutePlannerMapper {
 
-    String GET_KEY = "SELECT `key` FROM `ev-route-planner`.`api-keys` WHERE id = #{id};";
-
-    @Select(GET_KEY)
+    @Select("SELECT `apiKey` FROM `ev_route_planner`.`users` WHERE id = #{id};")
     public String getKey(int id);
 }

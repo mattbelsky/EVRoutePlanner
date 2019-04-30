@@ -6,17 +6,15 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 
-import java.util.ArrayList;
-
 @Mapper
 public interface UserMapper {
 
-    String SELECT_BY_ALIAS = "SELECT * FROM `ev-route-planner`.users WHERE alias = #{alias};";
-    String ADD_NEW_USER  = "INSERT INTO `ev-route-planner`.`users` (`alias`, `apiKey`) VALUES (#{alias}, #{apiKey});";
-    String SELECT_USER_BY_APIKEY = "SELECT * FROM `ev-route-planner`.users WHERE apiKey = #{apiKey};";
-    String SELECT_CALL_BY_APIKEY = "SELECT * FROM `ev-route-planner`.`api-calls` WHERE apiKey = #{apiKey};";
-    String ADD_NEW_CALL = "INSERT INTO `ev-route-planner`.`api-calls` (`apiKey`, `dateTime`) VALUES (#{arg0}, #{arg1});";
-    String SELECT_CALL_BY_APIKEY_AND_DATETIME = "SELECT * FROM `ev-route-planner`.`api-calls` " +
+    String SELECT_BY_ALIAS = "SELECT * FROM `ev_route_planner`.users WHERE alias = #{alias};";
+    String ADD_NEW_USER  = "INSERT INTO `ev_route_planner`.`users` (`alias`, `apiKey`) VALUES (#{alias}, #{apiKey});";
+    String SELECT_USER_BY_APIKEY = "SELECT * FROM `ev_route_planner`.users WHERE apiKey = #{apiKey};";
+    String SELECT_CALL_BY_APIKEY = "SELECT * FROM `ev_route_planner`.`api_calls` WHERE apiKey = #{apiKey};";
+    String ADD_NEW_CALL = "INSERT INTO `ev_route_planner`.`api_calls` (`apiKey`, `dateTime`) VALUES (#{arg0}, #{arg1});";
+    String SELECT_CALL_BY_APIKEY_AND_DATETIME = "SELECT * FROM `ev_route_planner`.`api_calls` " +
             "WHERE apiKey = #{arg0} AND dateTime = #{arg1};";
 
     @Select(SELECT_BY_ALIAS)

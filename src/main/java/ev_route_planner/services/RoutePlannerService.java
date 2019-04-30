@@ -2,6 +2,7 @@ package ev_route_planner.services;
 
 import ev_route_planner.exceptions.RouteNotFoundException;
 import ev_route_planner.mappers.RoutePlannerMapper;
+import ev_route_planner.model.RouteQueryData;
 import ev_route_planner.model.directions.Directions;
 import ev_route_planner.model.directions.OverviewPolyline;
 import ev_route_planner.model.geolocation.Location;
@@ -23,34 +24,32 @@ public class RoutePlannerService {
     @Autowired
     OpenChargeMapService openChargeMapService;
 
-    @Autowired
-    RoutePlannerMapper routePlannerMapper;
-
-    /*  Ultimately should return to RoutePlannerController an array of ChargingSites
-        Need to decode polyline into array of coords
-        For each coord set, call OpenChargeMapService obj.searchByLatLong, specify a distance, etc.
-        Need new method to compare arrays
-            Create new ArrayList that appends each array onto itself
-            If it contains identical ChargingSite objects, remove all but the first
-     */
-
     /**
      * The Google Directions API is queried with a set of starting and ending coordinates, which plans the optimal route
      * and returns an encoded polyline. The polyline is decoded in another method into an array of coordinates, each of
      * which is used to query the OpenChargeMaps API for EV charging sites nearby.
-     * @param startLat
-     * @param startLng
-     * @param endLat
-     * @param endLng
+     * @param routeQueryData -- contains all the data needed to query for charging stations along a route
      * @return an ArrayList of ChargingSite objects found along the route
      */
-    public ArrayList<ChargingSite> findRoute(double startLat, double startLng, double endLat, double endLng) throws RouteNotFoundException {
+    public ArrayList<ChargingSite> findRoute(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
-        /*  What can go wrong?
-                Parameters not entered properly (ie incomplete, not doubles) - HOW TO HANDLE?
-                No route exists - HANDLED
+        /*
+         * Initial defaults:
+         *   distance = 1
+         *   distanceUnit = 2 // 1 = km, 2 = miles
+         *   levelId = 3
+         *   maxResults = 3
          */
-        String key = routePlannerMapper.getKey(2);
+        double startLat = routeQueryData.getStartLat();
+        double startLng = routeQueryData.getStartLng();
+        double endLat = routeQueryData.getEndLat();
+        double endLng = routeQueryData.getEndLng();
+        double distance = routeQueryData.getDistance();
+        int distanceUnit = routeQueryData.getDistanceUnit();
+        int levelId = routeQueryData.getLevelId();
+        int maxResults = routeQueryData.getMaxResults();
+        String key = routeQueryData.getApiKey();
+
         String query = "https://maps.googleapis.com/maps/api/directions/json?" +
                 "origin=" + startLat + "," + startLng +
                 "&destination=" + endLat + "," + endLng +
@@ -60,7 +59,9 @@ public class RoutePlannerService {
         // Gets, decodes, and compiles the encoded polyline into an ArrayList of coordinates.
         String overviewPolyline;
         try {
-            overviewPolyline = directions.getRoutes()[0].getOverview_polyline().getPoints();
+            overviewPolyline = directions.getRoutes()[0]
+                    .getOverview_polyline()
+                    .getPoints();
         } catch (ArrayIndexOutOfBoundsException e) {
             throw new RouteNotFoundException();
         }
@@ -68,25 +69,20 @@ public class RoutePlannerService {
 
         // Finds an array of charging sites within a specified distance of each coordinate set and compiles the arrays
         // into an ArrayList.
-        /************* THESE VARIABLES SHOULD ULTIMATELY BE SET SOMEWHERE ELSE ***********/
         ArrayList<ChargingSite[]> sitesAlongRouteRepeatingElements = new ArrayList();
-        double distance = 1;
-        int distanceUnit = 2; // miles
-        /************* WANT 2 OR 3! NOT JUST ONE OR THE OTHER **************/
-        int levelID = 3;
-        int maxResults = 3;
         for (Location point : coordsAlongRoute) {
             ChargingSite[] sitesNearCoords = openChargeMapService.searchByLatLong(point.getLat(), point.getLng(),
-                    distance, distanceUnit, levelID, maxResults);
+                    distance, distanceUnit, levelId, maxResults);
             sitesAlongRouteRepeatingElements.add(sitesNearCoords);
         }
+        ArrayList<ChargingSite> sitesAlongRoute = removeRepeatingElements(sitesAlongRouteRepeatingElements);
 
-        return removeRepeatingElements(sitesAlongRouteRepeatingElements);
+        return sitesAlongRoute;
     }
 
     /**
      * Removes the repeating elements in an ArrayList of arrays of ChargingSite objects.
-     * @param sitesAlongRouteRepeatingElements the ArrayList of ChargingSite arrays
+     * @param sitesAlongRouteRepeatingElements -- the ArrayList of ChargingSite arrays
      * @return an ArrayList of sites along the route
      */
     public ArrayList<ChargingSite> removeRepeatingElements(ArrayList<ChargingSite[]> sitesAlongRouteRepeatingElements) {
@@ -115,7 +111,7 @@ public class RoutePlannerService {
 
     /**
      * Decodes the encoded polyline describing the geographical route into an ArrayList of coordinates.
-     * @param encoded the encoded polyline
+     * @param encoded -- the encoded polyline
      * @return the decoded ArrayList of coordinates
      */
     public ArrayList<Location> decodePolyline(String encoded) {

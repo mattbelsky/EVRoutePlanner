@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-
 @Service
 public class OpenChargeMapService {
 
@@ -20,52 +18,11 @@ public class OpenChargeMapService {
     @Autowired
     RoutePlannerMapper routePlannerMapper;
 
-    // Scans for available wifi networks and captures their BSSID, channel, and signal information.
-    // Apparently this method is completely unnecessary. No idea why though.
-//    public WifiAccessPoints[] getWifiNetworks() throws IOException {
-//        // The system command to execute
-//        String command = "nmcli -f BSSID,CHAN,SIGNAL dev wifi list";
-//        // Assigns a reference to the Process being executed
-//        Process p = Runtime.getRuntime().exec(command);
-//        // Gets the input stream of p and wraps it with a buffered reader
-//        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//
-//        // ArrayLists containing details on the available wifi networks
-//        ArrayList<String> bssid = new ArrayList<String>();
-//        ArrayList<String> signal = new ArrayList<String>();
-//        ArrayList<String> channel = new ArrayList<String>();
-//        String line;
-//
-//        // Sets the values of the ArrayLists
-//        try {
-//            while (r.readLine() != null) {
-//                line = r.readLine();
-//                bssid.add(line.substring(0, 17));
-//                signal.add(line.substring(25, 27));
-//                channel.add(line.substring(19, 21));
-//            }
-//        }
-//        catch (NullPointerException e) {
-//            // Do nothing.
-//        }
-//
-//        // Creates an array of objects containing data on the wifi networks
-//        WifiAccessPoints[] wifiAccessPoints = new WifiAccessPoints[bssid.size()];
-//
-//        // Sets the instance variables of each object in this array with the values from the ArrayLists
-//        for (int i = 0; i < wifiAccessPoints.length; i++) {
-//            wifiAccessPoints[i] = new WifiAccessPoints();
-//            wifiAccessPoints[i].setMacAddress(bssid.get(i));
-//            wifiAccessPoints[i].setSignalStrength(Integer.parseInt(signal.get(i).trim()));
-//            wifiAccessPoints[i].setChannel(Integer.parseInt(channel.get(i).trim()));
-//        }
-//
-//        return wifiAccessPoints;
-//    }
-
-    // Calls the Google Geolocation API which returns the user's approximate location based on detected wifi networks.
-    // Although I wrote it, this method works through some sorcery I don't understand.
-    public Geolocation locateDevice(/*WifiAccessPoints[] wap*/) throws IOException {
+    /**
+     * Gets the user's approximate location via a request to the Google Geolocation API.
+     * @return the Geolocation object containing the results of the the POST request to Google's API
+     */
+    public Geolocation locateDevice() {
 
         // The Google Geolocation API endpoint with API key
         String key = routePlannerMapper.getKey(1);
@@ -74,28 +31,36 @@ public class OpenChargeMapService {
         // The array of WifiAccessPoint objects containing data on available wifi networks is given an acceptable format
         // for a postForObject() request.
         LinkedMultiValueMap<String, WifiAccessPoints[]> request = new LinkedMultiValueMap<>();
-//        WifiAccessPoints[] wifiAccessPoints = getWifiNetworks();
-
-        /*  Why does the code below cause an error?? And how does the above work without a WifiAccessPoints[]
-            array being passed?   */
-//        for (int i = 0; i < wifiAccessPoints.length; i++) {
-//            request.add("wifiAccessPoints", wifiAccessPoints[i]);
-//        }
-
         Geolocation deviceLocation = restTemplate.postForObject(url, request, Geolocation.class);
-
         return deviceLocation;
     }
 
-    // Searches by country and returns an array of ChargingSite objects from that country
+    /**
+     * Searches for charging sites by country and returns a list of relevant ChargingSite objects.
+     * @param countryCode -- the ISO country code
+     * @param maxResults -- the maximum number of results to return for the given country
+     * @return an array of ChargingSite objects
+     */
     public ChargingSite[] searchByCountry(String countryCode, int maxResults) {
+
         String query = "https://api.openchargemap.io/v2/poi/?output=json&countrycode=" + countryCode +
                 "&maxresults=" + maxResults + "&compact=true&verbose=false";
         ChargingSite[] chargingSites = restTemplate.getForObject(query, ChargingSite[].class);
         return chargingSites;
     }
 
-    // Searches by latitude & longitude & distance in miles or km from it
+    /**
+     * Searches for charging sites by coordinates (lat/long) within a specified distance from it as described in miles
+     * or kilometers.
+     * @param latitude
+     * @param longitude
+     * @param distance -- the distance from the coordinates to search
+     * @param distanceUnit -- 1 = km, 2 = mi.
+     * @param levelID -- the charging station level: 1 = 120V, 2 = 240V, 3 = DC fast charging
+     *                (https://pluginamerica.org/understanding-electric-vehicle-charging/)
+     * @param maxResults -- the maximum number of results to return for the given coordinates
+     * @return an array of ChargingSite objects
+     */
     public ChargingSite[] searchByLatLong(double latitude, double longitude, double distance, int distanceUnit,
                                           int levelID, int maxResults) {
         String fullQuery = "https://api.openchargemap.io/v2/poi/?output=json" +
@@ -105,12 +70,16 @@ public class OpenChargeMapService {
                 "&distanceunit=" + distanceUnit +
                 "&levelid=" + levelID +
                 "&maxresults=" + maxResults + "&compact=true&verbose=false";
+        System.out.println(fullQuery);
         ChargingSite[] chargingSites = restTemplate.getForObject(fullQuery, ChargingSite[].class);
         return chargingSites;
     }
 
-    // Searches for charging stations near the user
-    public ChargingSite[] searchNearMe() throws IOException {
+    /**
+     * Searches for charging charging stations near the user.
+     * @return an array of Charging Site objects
+     */
+    public ChargingSite[] searchNearMe() {
 
         // Gets the user's device's location and prepares the latitude & longitude arguments for insertion into the query.
         Geolocation userLocation = locateDevice();
@@ -121,7 +90,5 @@ public class OpenChargeMapService {
         // distance, distanceUnit, and maxResults are predefined here
         ChargingSite[] sitesNearUser = searchByLatLong(latitude, longitude, 1500, 2, 2, 100);
         return sitesNearUser;
-
-//        return locateDevice(/*getWifiNetworks()*/); // previously needed this return type
     }
 }

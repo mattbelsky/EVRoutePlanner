@@ -26,13 +26,13 @@ public class OpenChargeMapController {
 
     /**
      * Queries by country
-     * @param countryCode ISO country code (i.e. US, CA, ID, UK)
-     * @param maxResults the maximum number of results to return
-     * @return an array objects containing details about each charging site
+     * @param countryCode -- ISO country code (i.e. US, CA, ID, UK)
+     * @param maxResults -- the maximum number of results to return
+     * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
      */
     @RequestMapping("/bycountry")
     public GeneralResponse searchByCountry(@RequestParam(value = "q") String countryCode,
-                                          @RequestParam(value = "maxresults", defaultValue = "50") int maxResults) {
+                                           @RequestParam(value = "maxresults", defaultValue = "50") int maxResults) {
         ChargingSite[] chargingSites = openChargeMapService.searchByCountry(countryCode, maxResults);
         GeneralResponse response = new GeneralResponse(chargingSites);
         return response;
@@ -42,19 +42,19 @@ public class OpenChargeMapController {
      * Searches by latitude & longitude & distance in miles or km from it.
      * @param latitude
      * @param longitude
-     * @param distance radius to search
-     * @param distanceUnit 1 = km, 2 = mi
-     * @param levelID charging levels (1 = home outlet, 2 & 3 = faster charging)
-     * @param maxResults the maximum number of results to return
-     * @return an array objects containing details about each charging site
+     * @param distance -- radius to search
+     * @param distanceUnit -- 1 = km, 2 = mi
+     * @param levelID -- charging levels (1 = home outlet, 2 & 3 = faster charging)
+     * @param maxResults -- the maximum number of results to return
+     * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
      */
     @RequestMapping("/bylatlong")
     public GeneralResponse searchByLatLong(@RequestParam(value = "latitude") double latitude,
-                                          @RequestParam(value = "longitude") double longitude,
-                                          @RequestParam(value = "distance") double distance,
-                                          @RequestParam(value = "distanceunit") int distanceUnit,
-                                          @RequestParam(value = "levelid") int levelID,
-                                          @RequestParam(value = "maxresults") int maxResults) {
+                                           @RequestParam(value = "longitude") double longitude,
+                                           @RequestParam(value = "distance") double distance,
+                                           @RequestParam(value = "distanceunit") int distanceUnit,
+                                           @RequestParam(value = "levelid") int levelID,
+                                           @RequestParam(value = "maxresults") int maxResults) {
         ChargingSite[] chargingSites = openChargeMapService.searchByLatLong(latitude, longitude, distance, distanceUnit,
                 levelID, maxResults);
         GeneralResponse response = new GeneralResponse(chargingSites);
@@ -64,13 +64,14 @@ public class OpenChargeMapController {
     /**
      * Gets user's approximate latitude and longitude and shows charging stations within a predefined radius.
      * Although the request in the service class is using the postForObject() method, this is a GET request apparently.
-     * @return an array objects containing details about each charging site
+     * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
      * @throws IOException
      */
-    @RequestMapping(method = RequestMethod.GET, value = "/nearme")
+    @RequestMapping(method = RequestMethod.GET, value = "/")
     public GeneralResponse searchNearMe() throws IOException {
         ChargingSite[] sitesNearMe = openChargeMapService.searchNearMe();
         GeneralResponse response = new GeneralResponse(sitesNearMe);
         return response;
     }
 }
+

@@ -15,7 +15,12 @@ public class UserService {
     @Autowired
     UserMapper userMapper;
 
-    // Adds a new user to the database.
+    /**
+     * Adds a new user to the database.
+     * @param alias -- the username
+     * @param apiKey -- the new API key
+     * @return
+     */
     public User registerUser(String alias, String apiKey) {
         User user = new User();
         user.setAlias(alias);
@@ -24,7 +29,11 @@ public class UserService {
         return userMapper.findByAlias(alias);
     }
 
-    // Checks if a user known by this alias already exists.
+    /**
+     * Checks if a user known by this alias already exists.
+     * @param alias -- the username
+     * @return true if the user exists, false otherwise
+     */
     public boolean userExists(String alias) {
         boolean userExists;
         try {
@@ -35,7 +44,11 @@ public class UserService {
         return userExists;
     }
 
-    // Checks if a specified API key has exceeded the rate limit.
+    /**
+     * Checks if a specified API key has exceeded the rate limit.
+     * @param apiKey
+     * @return true if the API rate limit has been exceeded, false otherwise
+     */
     public boolean apiCallsExceeded(String apiKey) {
         boolean callsExceeded = false;
         int limitPerMinute = 0;
@@ -55,10 +68,6 @@ public class UserService {
         }
         int countCallsPerMinute = 0;
         int countCallsPerDay = 0;
-        // Compares the date and time of each dateTime field from the database to the current one -- limit exceeded?
-        /*  QUESTION: While it seems simpler to get date and time from localDateTimeObj.toString().substring(), is it
-            better/safer to get it from localDateTimeObj.getMonth(), .getMin(), etc. even though it's more verbose?
-         */
         for (ApiCall call : calls) {
             String currentDate = currentDateTime.substring(0, 10);
             String callDate = call.getDateTime().substring(0, 10);
@@ -74,14 +83,22 @@ public class UserService {
         return callsExceeded;
     }
 
-    // Adds a new API call with key and time to the database.
+    /**
+     * Adds a new API call with key and time to the database.
+     * @param apiKey
+     * @return the API call data just entered
+     */
     public ApiCall addApiCall(String apiKey) {
         String currentDateTime = LocalDateTime.now().toString();
         userMapper.addApiCall(apiKey, currentDateTime);
         return userMapper.getCallByKeyAndDateTime(apiKey, currentDateTime);
     }
 
-    // Checks if an API key is in the database.
+    /**
+     * Checks if an API key is in the database.
+     * @param apiKey
+     * @return true if the key exists, false otherwise
+     */
     public boolean keyExists(String apiKey) {
         boolean keyExists;
         try {
@@ -92,7 +109,10 @@ public class UserService {
         return keyExists;
     }
 
-    // Generates an API key for the user.
+    /**
+     * Generates an API key for the user.
+     * @return the new API key
+     */
     public String generateAPIKey() {
         String apiKey = UUID.randomUUID().toString();
         apiKey = apiKey.replaceAll("-", "");
