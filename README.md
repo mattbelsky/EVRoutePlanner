@@ -4,13 +4,13 @@ This API's primary purpose is to create a list of electric vehicle (EV) charging
 Additional functionality includes the ability to search for charging sites by country (ISO country code), by latitude and longitude, and near the user's location, the latter of which calls the Google Geolocation API for the location.
 
 ## Endpoints
-```/routeplanner/go?startlat={start_latitude}&startlng={start_longitude}&endlat={end_latitude}&endlng={end_longitude}&maxresults={max_results}&apikey={api_key}```
+```/routeplanner/go?startlat={start_latitude}&startlng={start_longitude}&endlat={end_latitude}&endlng={end_longitude}&maxresults={max_results}```
 
 Searches for sites along a route that begins with a the specified starting and ending coordinates. This query requires a key as it potentially requires many calls to external APIs.
 
 ```/getakey?alias={alias}```
 
-Allows the user to register an alias and get a key to access the API.
+Allows the user to register an alias and get a key to access the API. (Note: at present, a key is not needed to use the API.)
 
 ```/openchargemap/bycountry?q={countryCode}&maxresults={maxResults}```
 
