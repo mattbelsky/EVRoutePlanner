@@ -87,5 +87,22 @@ public class RoutePlannerController {
         return new GeneralResponse(sites);
     }
 
-
+    @GetMapping("/route/polyline")
+    public String getRoutePolyline(@RequestParam("start_lat") double startLat,
+                                   @RequestParam("start_lng") double startLng,
+                                   @RequestParam("end_lat") double endLat,
+                                   @RequestParam("end_lng") double endLng) throws RouteNotFoundException {
+        RouteQueryData routeQueryData = new RouteQueryData(
+                startLat,
+                startLng,
+                endLat,
+                endLng,
+                0,
+                0,
+                0,
+                0,
+                googleMapsApiKey
+        );
+        return routePlannerService.getRoutePolyline(routeQueryData);
+    }
 }
