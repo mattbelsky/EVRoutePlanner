@@ -21,20 +21,25 @@ public class RoutePlannerService {
 
     private static final int EARTH_RADIUS = 6371; // Approx Earth radius in KM
     private static final int DISTANCE_ONE_DEGREE_LATITUDE = 111; // Approx distance between one degree difference in latitude in km.
-
-    @Autowired RestTemplate restTemplate;
-    @Autowired OpenChargeMapService openChargeMapService;
     private double[] distBtwnOneLngAtEachLat;
+
+    @Autowired
+    RestTemplate restTemplate;
+
+    @Autowired
+    OpenChargeMapService openChargeMapService;
 
     /**
      * The Google Directions API is queried with a set of starting and ending coordinates, which plans the optimal route
      * and returns an encoded polyline. The polyline is decoded in another method into an array of coordinates, each of
-     * which is used to query the OpenChargeMaps API for EV charging sites nearby.
+     * which is filtered according to its distance from the previous coordinate and is used to query the OpenChargeMaps API
+     * for EV charging sites nearby.
      * @param routeQueryData -- contains all the data needed to query for charging stations along a route
      * @return an ArrayList of ChargingSite objects found along the route
      */
-    public ArrayList<ChargingSite> findRoute(RouteQueryData routeQueryData) throws RouteNotFoundException {
+    public ArrayList<ChargingSite> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
+        distBtwnOneLngAtEachLat = buildListDistances(); // Result should already be cached.
         /*
          * Initial defaults:
          *   distance = 1
@@ -42,34 +47,18 @@ public class RoutePlannerService {
          *   levelId = 3
          *   maxResults = 3
          */
-        double startLat = routeQueryData.getStartLat();
-        double startLng = routeQueryData.getStartLng();
-        double endLat = routeQueryData.getEndLat();
-        double endLng = routeQueryData.getEndLng();
         double distance = routeQueryData.getDistance();
         int distanceUnit = routeQueryData.getDistanceUnit();
         int levelId = routeQueryData.getLevelId();
         int maxResults = routeQueryData.getMaxResults();
-        String key = routeQueryData.getApiKey();
-
-        String query = "https://maps.googleapis.com/maps/api/directions/json?" +
-                "origin=" + startLat + "," + startLng +
-                "&destination=" + endLat + "," + endLng +
-                "&key=" + key;
-        Directions directions = restTemplate.getForObject(query, Directions.class);
 
         // Gets, decodes, and compiles the encoded polyline into an ArrayList of coordinates.
-        String overviewPolyline;
-        try {
-            overviewPolyline = directions.getRoutes()[0]
-                    .getOverview_polyline()
-                    .getPoints();
-        } catch (ArrayIndexOutOfBoundsException e) {
-            throw new RouteNotFoundException();
-        }
-        ArrayList<Location> coordsAlongRoute = decodePolyline(overviewPolyline);
+        String polyline = getRoutePolyline(routeQueryData);
+        ArrayList<Location> coordsAlongRoute = decodePolyline(polyline);
 
-        // FILTER COORDINATES -- MAKE A LIST OF COORDS WHERE EACH COORD IS THE FARTHEST FROM THE PREVIOUS ONE WITHIN A CERTAIN DISTANCE
+        // Removes all coordinates from the list within the specified distance from the previous set. Pre-filtering ensures
+        // that fewer calls are made to the OpenChargeMap API and results in a much faster response from this application.
+        coordsAlongRoute = filterLocationsByDistance(coordsAlongRoute, distance, distanceUnit);
 
         // Finds an array of charging sites within a specified distance of each coordinate set and compiles the arrays
         // into an ArrayList.
@@ -84,6 +73,13 @@ public class RoutePlannerService {
         return sitesAlongRoute;
     }
 
+    /**
+     * Queries the Google Directions API for a route based on the input data and returns the encoded polyline detailing
+     * the route.
+     * @param routeQueryData
+     * @return the encoded polyline which, when decoded, contains a list of coordinates detailing the route
+     * @throws RouteNotFoundException
+     */
     public String getRoutePolyline(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
         double startLat = routeQueryData.getStartLat();
@@ -97,82 +93,105 @@ public class RoutePlannerService {
                 "&destination=" + endLat + "," + endLng +
                 "&key=" + key;
         Directions directions = restTemplate.getForObject(query, Directions.class);
-
-        // Gets, decodes, and compiles the encoded polyline into an ArrayList of coordinates.
-        String overviewPolyline;
         try {
-            overviewPolyline = directions.getRoutes()[0]
+            return directions.getRoutes()[0]
                     .getOverview_polyline()
                     .getPoints();
         } catch (ArrayIndexOutOfBoundsException e) {
             throw new RouteNotFoundException();
         }
-
-        return overviewPolyline;
     }
-    
-    private ArrayList<Location> filterLocationsByDistance(ArrayList<Location> locations, int distance, String unit) {
+
+    // Filters each set of coordinates based on whether its latitude or longitude exceeds the max lats or lngs of the previous.
+    // Essentially, adds a set to the list if it falls outside a box whose sides' lengths are each double the distance param.
+    private ArrayList<Location> filterLocationsByDistance(ArrayList<Location> locations, double distance, int unit) {
 
         ArrayList<Location> filteredLocations = new ArrayList<>();
-        boolean flag = false;
+        if (unit == 2) // 1 = km, 2 = miles -- default is km
+            distance *= 1.6;
 
         for (int i = 0, j = i + 1; i < locations.size() - 1; i = j) {
 
             Location iLoc = locations.get(i);
             filteredLocations.add(iLoc);
 
+            // Gets the position in the list of the next location outside the required range.
             double iLat = iLoc.getLat();
             double iLng = iLoc.getLng();
             double[] latBounds = getMaxMinLats(iLat, distance);
             double[] lngBounds = getMaxMinLngs(iLat, iLng, distance);
-            double maxSumNE = Math.abs(latBounds[0] + lngBounds[0]);
-            double maxSumSW = Math.abs(lngBounds[1] + lngBounds[1]);
+//            double maxSumNE = Math.abs(latBounds[0]) + Math.abs(lngBounds[0]);
+//            double maxSumNW = Math.abs(latBounds[0]) + Math.abs(lngBounds[1]);
+//            double maxSumSW = Math.abs(latBounds[1]) + Math.abs(lngBounds[1]);
+//            double maxSumSE = Math.abs(latBounds[1]) + Math.abs(lngBounds[0]);
 
-            while (flag == false && j < locations.size()) {
+            while (j < locations.size() - 1) {
                 Location jLoc = locations.get(j);
                 double jLat = jLoc.getLat();
                 double jLng = jLoc.getLng();
-                double sumLatLng = Math.abs(jLat + jLng);
-                if (sumLatLng > maxSumNE || sumLatLng > maxSumSW) {
-                    flag = true;
-                    break;
-                }
+//                double sumLatLng = Math.abs(jLat) + Math.abs(jLng);
                 j++;
+                // If lat or lng is out of range...
+                if ((jLat > latBounds[0] || jLat < latBounds[1]) || (jLng > lngBounds[0] || jLng < lngBounds[1]))
+                    break;
             }
         }
 
-        Location last = locations.get(locations.size());
+        Location last = locations.get(locations.size() - 1);
         filteredLocations.add(last);
         return filteredLocations;
     }
 
-    private double[] getMaxMinLats(double lat, int distance) {
+    private double[] getMaxMinLats(double lat, double distance) {
 
         double north = lat + (distance / DISTANCE_ONE_DEGREE_LATITUDE);
         double south = lat - (distance / DISTANCE_ONE_DEGREE_LATITUDE);
+        if (north > 90)
+            north = 90;
+        if (south < -90)
+            south = -90;
         return new double[] { north, south };
     }
 
-    private double[] getMaxMinLngs(double lat, double lng, int distance) {
+    private double[] getMaxMinLngs(double lat, double lng, double distance) {
 
-        int nearestLatNorth = (int) (Math.round(lat + (distance / DISTANCE_ONE_DEGREE_LATITUDE)));
-        int nearestLatSouth = (int) (Math.round(lat - (distance / DISTANCE_ONE_DEGREE_LATITUDE)));
+        double[] maxMinLats = getMaxMinLats(lat, distance);
+        int nearestLatNorth = (int) (maxMinLats[0]);
+        int nearestLatSouth = (int) (maxMinLats[1]);
         double east = lng + (distance / distBtwnOneLngAtEachLat[nearestLatNorth]);
         double west = lng - (distance / distBtwnOneLngAtEachLat[nearestLatSouth]);
+        east = setLngBounds(east);
+        west = setLngBounds(west);
         return new double[] { east, west };
     }
 
     /**
-     * Creates an array containing the distance between one degree longitude at each degree latitude (0-90). Should be
-     * called only once when the program starts.
+     * Ensures that longitude values remain valid if the input exceeds +-180 degrees.
+     * @param lng
+     * @return the valid longitude value
      */
-    @Cacheable
-    public void makeListDistances() {
+    private double setLngBounds(double lng) {
 
-        distBtwnOneLngAtEachLat = new double[91];
+        if (lng > 180) {
+            lng = 180 - lng % 180;
+            if (lng != 180)
+                lng *= -1;
+        } else if (lng <= -180)
+            lng = 180 - (lng * -1) % 180;
+        return lng;
+    }
+
+    /**
+     * Creates an array containing the distance between one degree longitude at each degree latitude (0-90).
+     */
+    @Cacheable("distances")
+    public double[] buildListDistances() {
+
+        double distances[] = new double[91];
         for (int i = 0; i <= 90; i++) {
-            distBtwnOneLngAtEachLat[i] = calcDistance(i);
+            distances[i] = calcDistance(i);
         }
+        return distances;
     }
 
     /**

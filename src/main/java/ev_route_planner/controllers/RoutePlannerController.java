@@ -6,6 +6,7 @@ import ev_route_planner.exceptions.RouteNotFoundException;
 import ev_route_planner.mappers.RoutePlannerMapper;
 import ev_route_planner.model.GeneralResponse;
 import ev_route_planner.model.RouteQueryData;
+import ev_route_planner.model.geolocation.Location;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import ev_route_planner.services.RoutePlannerService;
 import ev_route_planner.services.UserService;
@@ -52,14 +53,14 @@ public class RoutePlannerController {
      * @throws RateLimitException
      */
     @GetMapping("/go")
-    public GeneralResponse getPolyline(@RequestParam("start_lat") double startLat,
-                                       @RequestParam("start_lng") double startLng,
-                                       @RequestParam("end_lat") double endLat,
-                                       @RequestParam("end_lng") double endLng,
-                                       @RequestParam("distance") double distance,
-                                       @RequestParam("distance_unit") int distanceUnit,
-                                       @RequestParam("level_id") int levelId,
-                                       @RequestParam("max_results") int maxResults)
+    public ArrayList<ChargingSite> getChargingSites(@RequestParam("start_lat") double startLat,
+                                                    @RequestParam("start_lng") double startLng,
+                                                    @RequestParam("end_lat") double endLat,
+                                                    @RequestParam("end_lng") double endLng,
+                                                    @RequestParam("distance") double distance,
+                                                    @RequestParam("distance_unit") int distanceUnit,
+                                                    @RequestParam("level_id") int levelId,
+                                                    @RequestParam("max_results") int maxResults)
             throws RouteNotFoundException, KeyDoesNotExistException, RateLimitException {
 
 
@@ -79,12 +80,12 @@ public class RoutePlannerController {
 //        if (!userService.keyExists(apiKey)) throw new KeyDoesNotExistException();
 //        if (userService.apiCallsExceeded(apiKey)) throw new RateLimitException();
 
-        ArrayList<ChargingSite> sites = routePlannerService.findRoute(routeQueryData);
+        ArrayList<ChargingSite> sites = routePlannerService.getChargingSites(routeQueryData);
 
 //        // Increments the total number of API calls made
 //        userService.addApiCall(apiKey);
 
-        return new GeneralResponse(sites);
+        return sites;
     }
 
     @GetMapping("/route/polyline")
