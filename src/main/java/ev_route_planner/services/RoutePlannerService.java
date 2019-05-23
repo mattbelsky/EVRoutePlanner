@@ -86,7 +86,7 @@ public class RoutePlannerService {
         return sitesFiltered;
     }
 
-    synchronized public void buildListSitesUnfiltered(QueryTaskWrapper wrapper) {
+    public void buildListSitesUnfiltered(QueryTaskWrapper wrapper) {
 
 //            logger.info("Getting query result...");
 //            ChargingSite[] sites = ftSites.get(); // API call takes ~ 0.3 seconds. This method is blocking.
@@ -94,13 +94,15 @@ public class RoutePlannerService {
         boolean done = false;
         while (!done) {
             done = wrapper.sites != null;
-            logger.info("Query result still null...");
+//            logger.info("Query result still null...");
             try {
                 Thread.sleep(5l);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
+        if (wrapper.sites.length == 0)
+            logger.info("Array size = 0. Not going to attempt to add anything to the list.\n");
         if (wrapper.sites.length > 0) {
             logger.info("Attempting to add result with length " + wrapper.sites.length + " to the list...");
             listSitesUnfiltered.add(wrapper.sites);
