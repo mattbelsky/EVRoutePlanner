@@ -1,7 +1,5 @@
 package ev_route_planner.model.directions;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 public class Directions {
 
     Routes[] routes;

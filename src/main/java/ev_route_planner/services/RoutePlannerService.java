@@ -1,33 +1,40 @@
 package ev_route_planner.services;
 
 import ev_route_planner.exceptions.RouteNotFoundException;
-import ev_route_planner.mappers.RoutePlannerMapper;
 import ev_route_planner.model.RouteQueryData;
 import ev_route_planner.model.directions.Directions;
-import ev_route_planner.model.directions.OverviewPolyline;
 import ev_route_planner.model.geolocation.Location;
 import ev_route_planner.model.open_charge_map.ChargingSite;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 @Service
 public class RoutePlannerService {
 
     private static final int EARTH_RADIUS = 6371; // Approx Earth radius in KM
     private static final int DISTANCE_ONE_DEGREE_LATITUDE = 111; // Approx distance between one degree difference in latitude in km.
+
     private double[] distBtwnOneLngAtEachLat;
+    public ArrayList<ChargingSite[]> listSitesUnfiltered = new ArrayList<>();
+    Logger logger = LoggerFactory.getLogger(RoutePlannerService.class);
 
     @Autowired
     RestTemplate restTemplate;
 
     @Autowired
     OpenChargeMapService openChargeMapService;
+
+    @Autowired
+    ThreadPoolTaskExecutor executor;
 
     /**
      * The Google Directions API is queried with a set of starting and ending coordinates, which plans the optimal route
@@ -52,25 +59,53 @@ public class RoutePlannerService {
         int levelId = routeQueryData.getLevelId();
         int maxResults = routeQueryData.getMaxResults();
 
-        // Gets, decodes, and compiles the encoded polyline into an ArrayList of coordinates.
+        // Gets, decodes, and transforms the encoded polyline into a list of coordinate wrapper objects.
         String polyline = getRoutePolyline(routeQueryData);
-        ArrayList<Location> coordsAlongRoute = decodePolyline(polyline);
+        ArrayList<Location> routeCoords = decodePolyline(polyline);
 
         // Removes all coordinates from the list within the specified distance from the previous set. Pre-filtering ensures
         // that fewer calls are made to the OpenChargeMap API and results in a much faster response from this application.
-        coordsAlongRoute = filterLocationsByDistance(coordsAlongRoute, distance, distanceUnit);
+        routeCoords = filterLocationsByDistance(routeCoords, distance, distanceUnit);
 
-        // Finds an array of charging sites within a specified distance of each coordinate set and compiles the arrays
-        // into an ArrayList.
-        ArrayList<ChargingSite[]> sitesAlongRouteRepeatingElements = new ArrayList();
-        for (Location point : coordsAlongRoute) {
-            ChargingSite[] sitesNearCoords = openChargeMapService.searchByLatLong(point.getLat(), point.getLng(),
+        // Finds an array of charging sites within a specified distance of each coordinate set and adds the arrays to an ArrayList.
+        for (int i = 0; i < routeCoords.size(); i++) {
+            QueryTaskWrapper queryWrapper = new QueryTaskWrapper(executor, restTemplate, routeCoords.get(i).getLat(), routeCoords.get(i).getLng(),
                     distance, distanceUnit, levelId, maxResults);
-            sitesAlongRouteRepeatingElements.add(sitesNearCoords);
+            executor.execute(queryWrapper);
+//            QueryTask queryTask = new QueryTask(restTemplate, routeCoords.get(i).getLat(), routeCoords.get(i).getLng(),
+//                    distance, distanceUnit, levelId, maxResults);
+//            FutureTask<ChargingSite[]> cfSitesUnfiltered = (FutureTask<ChargingSite[]>) (executor.submit(queryTask));
+//            logger.info("OpenChargeMaps API to be queried for coordinates " +
+//                            "(" + routeCoords.get(i).getLat() + ", " + routeCoords.get(i).getLng() + ")" +
+//                    ", set #" + (i + 1) + " of " + routeCoords.size() + ".");
+            buildListSitesUnfiltered(queryWrapper);
         }
-        ArrayList<ChargingSite> sitesAlongRoute = removeRepeatingElements(sitesAlongRouteRepeatingElements);
 
-        return sitesAlongRoute;
+        ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
+
+        return sitesFiltered;
+    }
+
+    synchronized public void buildListSitesUnfiltered(QueryTaskWrapper wrapper) {
+
+//            logger.info("Getting query result...");
+//            ChargingSite[] sites = ftSites.get(); // API call takes ~ 0.3 seconds. This method is blocking.
+//            logger.info("Query complete.\n");
+        boolean done = false;
+        while (!done) {
+            done = wrapper.sites != null;
+            logger.info("Query result still null...");
+            try {
+                Thread.sleep(5l);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        if (wrapper.sites.length > 0) {
+            logger.info("Attempting to add result with length " + wrapper.sites.length + " to the list...");
+            listSitesUnfiltered.add(wrapper.sites);
+            logger.info("Result successfully added.\n");
+        }
     }
 
     /**
@@ -94,6 +129,7 @@ public class RoutePlannerService {
                 "&key=" + key;
         Directions directions = restTemplate.getForObject(query, Directions.class);
         try {
+            logger.info("Google Directions API successfully queried.");
             return directions.getRoutes()[0]
                     .getOverview_polyline()
                     .getPoints();
@@ -139,6 +175,7 @@ public class RoutePlannerService {
 
         Location last = locations.get(locations.size() - 1);
         filteredLocations.add(last);
+        logger.info("Coordinates filtered out within a box around the original coordinates.");
         return filteredLocations;
     }
 
