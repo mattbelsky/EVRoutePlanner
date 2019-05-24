@@ -4,9 +4,7 @@ import ev_route_planner.exceptions.KeyDoesNotExistException;
 import ev_route_planner.exceptions.RateLimitException;
 import ev_route_planner.exceptions.RouteNotFoundException;
 import ev_route_planner.mappers.RoutePlannerMapper;
-import ev_route_planner.model.GeneralResponse;
 import ev_route_planner.model.RouteQueryData;
-import ev_route_planner.model.geolocation.Location;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import ev_route_planner.services.RoutePlannerService;
 import ev_route_planner.services.UserService;
@@ -53,7 +51,7 @@ public class RoutePlannerController {
      * @throws RateLimitException
      */
     @GetMapping("/go")
-    public ArrayList<ChargingSite[]> getChargingSites(@RequestParam("start_lat") double startLat,
+    public ArrayList<ChargingSite> getChargingSites(@RequestParam("start_lat") double startLat,
                                                     @RequestParam("start_lng") double startLng,
                                                     @RequestParam("end_lat") double endLat,
                                                     @RequestParam("end_lng") double endLng,
@@ -80,7 +78,7 @@ public class RoutePlannerController {
 //        if (!userService.keyExists(apiKey)) throw new KeyDoesNotExistException();
 //        if (userService.apiCallsExceeded(apiKey)) throw new RateLimitException();
 
-        ArrayList<ChargingSite[]> sites = routePlannerService.getChargingSites(routeQueryData);
+        ArrayList<ChargingSite> sites = routePlannerService.getChargingSites(routeQueryData);
 
 //        // Increments the total number of API calls made
 //        userService.addApiCall(apiKey);
@@ -88,7 +86,7 @@ public class RoutePlannerController {
         return sites;
     }
 
-    @GetMapping("/route/polyline")
+    @GetMapping("/polyline")
     public String getRoutePolyline(@RequestParam("start_lat") double startLat,
                                    @RequestParam("start_lng") double startLng,
                                    @RequestParam("end_lat") double endLat,

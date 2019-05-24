@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
-import java.util.concurrent.*;
 
 @Service
 public class RoutePlannerService {
@@ -23,7 +22,6 @@ public class RoutePlannerService {
     private static final int DISTANCE_ONE_DEGREE_LATITUDE = 111; // Approx distance between one degree difference in latitude in km.
 
     private double[] distBtwnOneLngAtEachLat;
-    public ArrayList<ChargingSite[]> listSitesUnfiltered = new ArrayList<>();
     Logger logger = LoggerFactory.getLogger(RoutePlannerService.class);
 
     @Autowired
@@ -31,9 +29,6 @@ public class RoutePlannerService {
 
     @Autowired
     OpenChargeMapService openChargeMapService;
-
-    @Autowired
-    QueryTask queryTask;
 
     @Autowired
     ThreadPoolTaskExecutor executor;
@@ -46,9 +41,11 @@ public class RoutePlannerService {
      * @param routeQueryData -- contains all the data needed to query for charging stations along a route
      * @return an ArrayList of ChargingSite objects found along the route
      */
-    public ArrayList<ChargingSite[]> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
+    public ArrayList<ChargingSite> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
+        logger.info("getChargingSites() executing...");
         distBtwnOneLngAtEachLat = buildListDistances(); // Result should already be cached.
+        ArrayList<ChargingSite[]> listSitesUnfiltered = new ArrayList<>();
         /*
          * Initial defaults:
          *   distance = 1
@@ -65,76 +62,45 @@ public class RoutePlannerService {
         String polyline = getRoutePolyline(routeQueryData);
         ArrayList<Location> routeCoords = decodePolyline(polyline);
 
-        // Removes all coordinates from the list within the specified distance from the previous set. Pre-filtering ensures
-        // that fewer calls are made to the OpenChargeMap API and results in a much faster response from this application.
+        /* Measures a box around each coordinate set whose dimensions are specified by the distance parameter and removes
+         * all coordinates that fall within that box. Repeats with the next coordinate set. Pre-filtering ensures that fewer
+         * calls are made to the OpenChargeMap API.
+         */
         routeCoords = filterLocationsByDistance(routeCoords, distance, distanceUnit);
 
-        // Finds an array of charging sites within a specified distance of each coordinate set and adds the arrays to an ArrayList.
+        // Finds an array of charging sites within a specified distance of each coordinate set and adds the arrays to a list.
         for (int i = 0; i < routeCoords.size(); i++) {
 
             double latitude = routeCoords.get(i).getLat();
             double longitude = routeCoords.get(i).getLng();
 
-//            logger.info("Executing async task from main thread...");
-//            CompletableFuture<ChargingSite[]> future = queryTask.call(latitude, longitude, distance, distanceUnit, levelId, maxResults);
-//            logger.info("Async task executed. Attempting to build a list from the results of execution #" + (i + 1) + "...");
-//
-//            buildListSitesUnfiltered(future);
-//            logger.info("List building function called.");
-
+            // Queries the external API for this set of coordinates in an anonymous Runnable managed by ThreadPoolTaskExecutor
+            // in order to speed up this method's response time.
             executor.execute(() -> {
-                String fullQuery = "https://api.openchargemap.io/v2/poi/?output=json" +
-                        "&latitude=" + latitude +
-                        "&longitude=" + longitude +
-                        "&distance=" + distance +
-                        "&distanceunit=" + distanceUnit +
-                        "&levelid=" + levelId +
-                        "&maxresults=" + maxResults + "&compact=true&verbose=false";
-
                 logger.info("Querying...");
-                ChargingSite[] sites = restTemplate.getForObject(fullQuery, ChargingSite[].class);
-                logger.info("Query completed.");
-                listSitesUnfiltered.add(sites);
-                logger.info("Sites added to list.");
+                ChargingSite[] sites = openChargeMapService.searchByLatLong(latitude, longitude, distance, distanceUnit,
+                        levelId, maxResults);
+                logger.info("Query response retrieved.");
+
+                if (sites.length > 0) {
+                    logger.info("Attempting to add result with length " + sites.length + " to the list...");
+                    listSitesUnfiltered.add(sites);
+                    logger.info("Result successfully added.");
+                } else
+                    logger.info("Array size = 0. Not going to attempt to add anything to the list.");
             });
         }
 
-//        ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
+        logger.info("Executor active count before blocking: " + executor.getActiveCount());
         while (executor.getActiveCount() > 1) {
-            try {
-                Thread.sleep(50l);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            // Not an ideal solution if multiple calls to this API are occurring, but works for what I need for now.
         }
-
-        return listSitesUnfiltered;
-    }
-
-    /* Adds the result of the asynchronous task to a global (for now) list. Still taking too long though. Based on timestamps,
-     * the external API call does not seem to execute until the CompletableFuture's get() is called. The calls on the separate
-     * threads are thus not executing simultaneously but sequentially and no time is saved with multithreading. Figure this out!
-     */
-    public void buildListSitesUnfiltered(CompletableFuture<ChargingSite[]> future) {
-
-        ChargingSite[] sites = new ChargingSite[0];
-
-        try {
-            logger.info("Getting query result with future.get()...");
-            // API call takes ~ 0.3 seconds. get() is blocking, and API call does not seem to execute until this method is called. Why?
-            sites = future.get();
-            logger.info("Query result retrieved.");
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-
-        if (sites.length == 0)
-            logger.info("Array size = 0. Not going to attempt to add anything to the list.\n");
-        if (sites.length > 0) {
-            logger.info("Attempting to add result with length " + sites.length + " to the list...");
-            listSitesUnfiltered.add(sites);
-            logger.info("Result successfully added\n");
-        }
+        logger.info("Executor active count after blocking: " + executor.getActiveCount());
+        logger.info("Unfiltered list size: " + listSitesUnfiltered.size());
+        ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
+        logger.info("Filtered list size: " + sitesFiltered.size());
+        logger.info("Returning result.");
+        return sitesFiltered;
     }
 
     /**
@@ -167,12 +133,20 @@ public class RoutePlannerService {
         }
     }
 
-    // Filters each set of coordinates based on whether its latitude or longitude exceeds the max lats or lngs of the previous.
-    // Essentially, adds a set to the list if it falls outside a box whose sides' lengths are each double the distance param.
+    /**
+     * Measures a box around each coordinate set whose dimensions are specified by the distance parameter, and removes all
+     * coordinates that fall within that box. Repeats with the next coordinate set. Pre-filtering ensures that fewer calls
+     * are made to the OpenChargeMap API.
+     * @param locations -- the list of coordinates produced by decoding the polyline describing the route found by Google's
+     *                  Directions API
+     * @param distance -- the distance from a coordinate set to the edge of the box
+     * @param unit -- 1 = km, 2 = miles
+     * @return the new smaller list of coordinates post-filtering
+     */
     private ArrayList<Location> filterLocationsByDistance(ArrayList<Location> locations, double distance, int unit) {
 
         ArrayList<Location> filteredLocations = new ArrayList<>();
-        if (unit == 2) // 1 = km, 2 = miles -- default is km
+        if (unit == 2)
             distance *= 1.6;
 
         for (int i = 0, j = i + 1; i < locations.size() - 1; i = j) {
@@ -185,16 +159,11 @@ public class RoutePlannerService {
             double iLng = iLoc.getLng();
             double[] latBounds = getMaxMinLats(iLat, distance);
             double[] lngBounds = getMaxMinLngs(iLat, iLng, distance);
-//            double maxSumNE = Math.abs(latBounds[0]) + Math.abs(lngBounds[0]);
-//            double maxSumNW = Math.abs(latBounds[0]) + Math.abs(lngBounds[1]);
-//            double maxSumSW = Math.abs(latBounds[1]) + Math.abs(lngBounds[1]);
-//            double maxSumSE = Math.abs(latBounds[1]) + Math.abs(lngBounds[0]);
 
             while (j < locations.size() - 1) {
                 Location jLoc = locations.get(j);
                 double jLat = jLoc.getLat();
                 double jLng = jLoc.getLng();
-//                double sumLatLng = Math.abs(jLat) + Math.abs(jLng);
                 j++;
                 // If lat or lng is out of range...
                 if ((jLat > latBounds[0] || jLat < latBounds[1]) || (jLng > lngBounds[0] || jLng < lngBounds[1]))

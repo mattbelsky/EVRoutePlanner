@@ -1,6 +1,5 @@
 package ev_route_planner.controllers;
 
-import ev_route_planner.exceptions.ControllerAdviceClass;
 import ev_route_planner.model.GeneralResponse;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +19,6 @@ public class OpenChargeMapController {
 
     @Autowired
     OpenChargeMapService openChargeMapService;
-
-    @Autowired
-    ControllerAdviceClass controllerAdviceClass;
 
     /**
      * Queries by country
@@ -48,30 +44,30 @@ public class OpenChargeMapController {
      * @param maxResults -- the maximum number of results to return
      * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
      */
-//    @RequestMapping("/bylatlong")
-//    public GeneralResponse searchByLatLong(@RequestParam(value = "latitude") double latitude,
-//                                           @RequestParam(value = "longitude") double longitude,
-//                                           @RequestParam(value = "distance") double distance,
-//                                           @RequestParam(value = "distanceunit") int distanceUnit,
-//                                           @RequestParam(value = "levelid") int levelID,
-//                                           @RequestParam(value = "maxresults") int maxResults) {
-//        ChargingSite[] chargingSites = openChargeMapService.searchByLatLong(latitude, longitude, distance, distanceUnit,
-//                levelID, maxResults);
-//        GeneralResponse response = new GeneralResponse(chargingSites);
-//        return response;
-//    }
+    @RequestMapping("/bylatlong")
+    public GeneralResponse searchByLatLong(@RequestParam(value = "latitude") double latitude,
+                                           @RequestParam(value = "longitude") double longitude,
+                                           @RequestParam(value = "distance") double distance,
+                                           @RequestParam(value = "distanceunit") int distanceUnit,
+                                           @RequestParam(value = "levelid") int levelID,
+                                           @RequestParam(value = "maxresults") int maxResults) {
+        ChargingSite[] chargingSites = openChargeMapService.searchByLatLong(latitude, longitude, distance, distanceUnit,
+                levelID, maxResults);
+        GeneralResponse response = new GeneralResponse(chargingSites);
+        return response;
+    }
 
-//    /**
-//     * Gets user's approximate latitude and longitude and shows charging stations within a predefined radius.
-//     * Although the request in the service class is using the postForObject() method, this is a GET request apparently.
-//     * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
-//     * @throws IOException
-//     */
-//    @RequestMapping(method = RequestMethod.GET, value = "/")
-//    public GeneralResponse searchNearMe() throws IOException {
-//        ChargingSite[] sitesNearMe = openChargeMapService.searchNearMe();
-//        GeneralResponse response = new GeneralResponse(sitesNearMe);
-//        return response;
-//    }
+    /**
+     * Gets user's approximate latitude and longitude and shows charging stations within a predefined radius.
+     * Although the request in the service class is using the postForObject() method, this is a GET request apparently.
+     * @return a response wrapper containing an array of ChargingSite objects containing details about each charging site
+     * @throws IOException
+     */
+    @RequestMapping(method = RequestMethod.GET, value = "/")
+    public GeneralResponse searchNearMe() {
+        ChargingSite[] sitesNearMe = openChargeMapService.searchNearMe();
+        GeneralResponse response = new GeneralResponse(sitesNearMe);
+        return response;
+    }
 }
 

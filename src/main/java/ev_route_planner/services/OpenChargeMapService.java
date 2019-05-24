@@ -5,13 +5,9 @@ import ev_route_planner.model.geolocation.Geolocation;
 import ev_route_planner.model.geolocation.WifiAccessPoints;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
-
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 public class OpenChargeMapService {
@@ -35,8 +31,7 @@ public class OpenChargeMapService {
         // The array of WifiAccessPoint objects containing data on available wifi networks is given an acceptable format
         // for a postForObject() request.
         LinkedMultiValueMap<String, WifiAccessPoints[]> request = new LinkedMultiValueMap<>();
-        Geolocation deviceLocation = restTemplate.postForObject(url, request, Geolocation.class);
-        return deviceLocation;
+        return restTemplate.postForObject(url, request, Geolocation.class);
     }
 
     /**
@@ -49,8 +44,7 @@ public class OpenChargeMapService {
 
         String query = "https://api.openchargemap.io/v2/poi/?output=json&countrycode=" + countryCode +
                 "&maxresults=" + maxResults + "&compact=true&verbose=false";
-        ChargingSite[] chargingSites = restTemplate.getForObject(query, ChargingSite[].class);
-        return chargingSites;
+        return restTemplate.getForObject(query, ChargingSite[].class);
     }
 
     /**
@@ -65,33 +59,30 @@ public class OpenChargeMapService {
      * @param maxResults -- the maximum number of results to return for the given coordinates
      * @return an array of ChargingSite objects
      */
-//    public CompletableFuture<ChargingSite[]> searchByLatLong(double latitude, double longitude, double distance, int distanceUnit,
-//                                                             int levelID, int maxResults) {
-//        String fullQuery = "https://api.openchargemap.io/v2/poi/?output=json" +
-//                "&latitude=" + latitude +
-//                "&longitude=" + longitude +
-//                "&distance=" + distance +
-//                "&distanceunit=" + distanceUnit +
-//                "&levelid=" + levelID +
-//                "&maxresults=" + maxResults + "&compact=true&verbose=false";
-//        ChargingSite[] chargingSites = restTemplate.getForObject(fullQuery, ChargingSite[].class);
-//        return CompletableFuture.completedFuture(chargingSites);
-//    }
+    public ChargingSite[] searchByLatLong(double latitude, double longitude, double distance, int distanceUnit,
+                                                             int levelID, int maxResults) {
+        String fullQuery = "https://api.openchargemap.io/v2/poi/?output=json" +
+                "&latitude=" + latitude +
+                "&longitude=" + longitude +
+                "&distance=" + distance +
+                "&distanceunit=" + distanceUnit +
+                "&levelid=" + levelID +
+                "&maxresults=" + maxResults + "&compact=true&verbose=false";
+        return restTemplate.getForObject(fullQuery, ChargingSite[].class);
+    }
 
-//    /**
-//     * Searches for charging charging stations near the user.
-//     * @return an array of Charging Site objects
-//     */
-//    public ChargingSite[] searchNearMe() {
-//
-//        // Gets the user's device's location and prepares the latitude & longitude arguments for insertion into the query.
-//        Geolocation userLocation = locateDevice();
-//        double latitude = userLocation.getLocation().getLat();
-//        double longitude = userLocation.getLocation().getLng();
-//
-//        // The array to return
-//        // distance, distanceUnit, and maxResults are predefined here
-//        ChargingSite[] sitesNearUser = searchByLatLong(latitude, longitude, 1500, 2, 2, 100);
-//        return sitesNearUser;
-//    }
+    /**
+     * Searches for charging charging stations near the user.
+     * @return an array of Charging Site objects
+     */
+    public ChargingSite[] searchNearMe() {
+
+        // Gets the user's device's location and prepares the latitude & longitude arguments for insertion into the query.
+        Geolocation userLocation = locateDevice();
+        double latitude = userLocation.getLocation().getLat();
+        double longitude = userLocation.getLocation().getLng();
+
+        // distance, distanceUnit, and maxResults are predefined here
+        return searchByLatLong(latitude, longitude, 1500, 2, 3, 100);
+    }
 }
