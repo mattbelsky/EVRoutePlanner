@@ -9,13 +9,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.*;
 
 @Service
 public class RoutePlannerService {
@@ -34,7 +32,7 @@ public class RoutePlannerService {
     OpenChargeMapService openChargeMapService;
 
     @Autowired
-    ThreadPoolTaskExecutor executor;
+    QueryTask queryTask;
 
     /**
      * The Google Directions API is queried with a set of starting and ending coordinates, which plans the optimal route
@@ -69,44 +67,45 @@ public class RoutePlannerService {
 
         // Finds an array of charging sites within a specified distance of each coordinate set and adds the arrays to an ArrayList.
         for (int i = 0; i < routeCoords.size(); i++) {
-            QueryTaskWrapper queryWrapper = new QueryTaskWrapper(executor, restTemplate, routeCoords.get(i).getLat(), routeCoords.get(i).getLng(),
-                    distance, distanceUnit, levelId, maxResults);
-            executor.execute(queryWrapper);
-//            QueryTask queryTask = new QueryTask(restTemplate, routeCoords.get(i).getLat(), routeCoords.get(i).getLng(),
-//                    distance, distanceUnit, levelId, maxResults);
-//            FutureTask<ChargingSite[]> cfSitesUnfiltered = (FutureTask<ChargingSite[]>) (executor.submit(queryTask));
-//            logger.info("OpenChargeMaps API to be queried for coordinates " +
-//                            "(" + routeCoords.get(i).getLat() + ", " + routeCoords.get(i).getLng() + ")" +
-//                    ", set #" + (i + 1) + " of " + routeCoords.size() + ".");
-            buildListSitesUnfiltered(queryWrapper);
+
+            double latitude = routeCoords.get(i).getLat();
+            double longitude = routeCoords.get(i).getLng();
+
+            logger.info("Executing async task from main thread...");
+            CompletableFuture<ChargingSite[]> future = queryTask.call(latitude, longitude, distance, distanceUnit, levelId, maxResults);
+            logger.info("Async task executed. Attempting to build a list from the results of execution #" + (i + 1) + "...");
+
+            buildListSitesUnfiltered(future);
+            logger.info("List building function called.");
         }
 
         ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
-
         return sitesFiltered;
     }
 
-    public void buildListSitesUnfiltered(QueryTaskWrapper wrapper) {
+    /* Adds the result of the asynchronous task to a global (for now) list. Still taking too long though. Based on timestamps,
+     * the external API call does not seem to execute until the CompletableFuture's get() is called. The calls on the separate
+     * threads are thus not executing simultaneously but sequentially and no time is saved with multithreading. Figure this out!
+     */
+    public void buildListSitesUnfiltered(CompletableFuture<ChargingSite[]> future) {
 
-//            logger.info("Getting query result...");
-//            ChargingSite[] sites = ftSites.get(); // API call takes ~ 0.3 seconds. This method is blocking.
-//            logger.info("Query complete.\n");
-        boolean done = false;
-        while (!done) {
-            done = wrapper.sites != null;
-//            logger.info("Query result still null...");
-            try {
-                Thread.sleep(5l);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        ChargingSite[] sites = new ChargingSite[0];
+
+        try {
+            logger.info("Getting query result with future.get()...");
+            // API call takes ~ 0.3 seconds. get() is blocking, and API call does not seem to execute until this method is called. Why?
+            sites = future.get();
+            logger.info("Query result retrieved.");
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
         }
-        if (wrapper.sites.length == 0)
+
+        if (sites.length == 0)
             logger.info("Array size = 0. Not going to attempt to add anything to the list.\n");
-        if (wrapper.sites.length > 0) {
-            logger.info("Attempting to add result with length " + wrapper.sites.length + " to the list...");
-            listSitesUnfiltered.add(wrapper.sites);
-            logger.info("Result successfully added.\n");
+        if (sites.length > 0) {
+            logger.info("Attempting to add result with length " + sites.length + " to the list...");
+            listSitesUnfiltered.add(sites);
+            logger.info("Result successfully added\n");
         }
     }
 
