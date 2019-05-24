@@ -53,7 +53,7 @@ public class RoutePlannerController {
      * @throws RateLimitException
      */
     @GetMapping("/go")
-    public ArrayList<ChargingSite> getChargingSites(@RequestParam("start_lat") double startLat,
+    public ArrayList<ChargingSite[]> getChargingSites(@RequestParam("start_lat") double startLat,
                                                     @RequestParam("start_lng") double startLng,
                                                     @RequestParam("end_lat") double endLat,
                                                     @RequestParam("end_lng") double endLng,
@@ -80,7 +80,7 @@ public class RoutePlannerController {
 //        if (!userService.keyExists(apiKey)) throw new KeyDoesNotExistException();
 //        if (userService.apiCallsExceeded(apiKey)) throw new RateLimitException();
 
-        ArrayList<ChargingSite> sites = routePlannerService.getChargingSites(routeQueryData);
+        ArrayList<ChargingSite[]> sites = routePlannerService.getChargingSites(routeQueryData);
 
 //        // Increments the total number of API calls made
 //        userService.addApiCall(apiKey);

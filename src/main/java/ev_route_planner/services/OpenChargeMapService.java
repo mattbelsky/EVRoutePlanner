@@ -13,8 +13,6 @@ import org.springframework.web.client.RestTemplate;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
-import static ev_route_planner.configuration.ConfigConstants.EXECUTOR;
-
 @Service
 public class OpenChargeMapService {
 

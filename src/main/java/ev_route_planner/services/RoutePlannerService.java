@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -34,6 +35,9 @@ public class RoutePlannerService {
     @Autowired
     QueryTask queryTask;
 
+    @Autowired
+    ThreadPoolTaskExecutor executor;
+
     /**
      * The Google Directions API is queried with a set of starting and ending coordinates, which plans the optimal route
      * and returns an encoded polyline. The polyline is decoded in another method into an array of coordinates, each of
@@ -42,7 +46,7 @@ public class RoutePlannerService {
      * @param routeQueryData -- contains all the data needed to query for charging stations along a route
      * @return an ArrayList of ChargingSite objects found along the route
      */
-    public ArrayList<ChargingSite> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
+    public ArrayList<ChargingSite[]> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
         distBtwnOneLngAtEachLat = buildListDistances(); // Result should already be cached.
         /*
@@ -71,16 +75,40 @@ public class RoutePlannerService {
             double latitude = routeCoords.get(i).getLat();
             double longitude = routeCoords.get(i).getLng();
 
-            logger.info("Executing async task from main thread...");
-            CompletableFuture<ChargingSite[]> future = queryTask.call(latitude, longitude, distance, distanceUnit, levelId, maxResults);
-            logger.info("Async task executed. Attempting to build a list from the results of execution #" + (i + 1) + "...");
+//            logger.info("Executing async task from main thread...");
+//            CompletableFuture<ChargingSite[]> future = queryTask.call(latitude, longitude, distance, distanceUnit, levelId, maxResults);
+//            logger.info("Async task executed. Attempting to build a list from the results of execution #" + (i + 1) + "...");
+//
+//            buildListSitesUnfiltered(future);
+//            logger.info("List building function called.");
 
-            buildListSitesUnfiltered(future);
-            logger.info("List building function called.");
+            executor.execute(() -> {
+                String fullQuery = "https://api.openchargemap.io/v2/poi/?output=json" +
+                        "&latitude=" + latitude +
+                        "&longitude=" + longitude +
+                        "&distance=" + distance +
+                        "&distanceunit=" + distanceUnit +
+                        "&levelid=" + levelId +
+                        "&maxresults=" + maxResults + "&compact=true&verbose=false";
+
+                logger.info("Querying...");
+                ChargingSite[] sites = restTemplate.getForObject(fullQuery, ChargingSite[].class);
+                logger.info("Query completed.");
+                listSitesUnfiltered.add(sites);
+                logger.info("Sites added to list.");
+            });
         }
 
-        ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
-        return sitesFiltered;
+//        ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
+        while (executor.getActiveCount() > 1) {
+            try {
+                Thread.sleep(50l);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return listSitesUnfiltered;
     }
 
     /* Adds the result of the asynchronous task to a global (for now) list. Still taking too long though. Based on timestamps,
