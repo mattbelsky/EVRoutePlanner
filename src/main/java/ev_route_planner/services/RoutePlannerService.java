@@ -8,12 +8,18 @@ import ev_route_planner.model.open_charge_map.ChargingSite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+
+import static ev_route_planner.Constants.CHARGING_SITES_EXECUTOR;
+import static ev_route_planner.Constants.QUERY_EXECUTOR;
 
 @Service
 public class RoutePlannerService {
@@ -21,7 +27,7 @@ public class RoutePlannerService {
     private static final int EARTH_RADIUS = 6371; // Approx Earth radius in KM
     private static final int DISTANCE_ONE_DEGREE_LATITUDE = 111; // Approx distance between one degree difference in latitude in km.
 
-    private double[] distBtwnOneLngAtEachLat;
+    double[] distBtwnOneLngAtEachLat;
     Logger logger = LoggerFactory.getLogger(RoutePlannerService.class);
 
     @Autowired
@@ -31,6 +37,7 @@ public class RoutePlannerService {
     OpenChargeMapService openChargeMapService;
 
     @Autowired
+    @Qualifier(QUERY_EXECUTOR)
     ThreadPoolTaskExecutor executor;
 
     /**
@@ -41,11 +48,12 @@ public class RoutePlannerService {
      * @param routeQueryData -- contains all the data needed to query for charging stations along a route
      * @return an ArrayList of ChargingSite objects found along the route
      */
-    public ArrayList<ChargingSite> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
+    @Async(CHARGING_SITES_EXECUTOR)
+    public CompletableFuture<ArrayList<ChargingSite>> getChargingSites(RouteQueryData routeQueryData) throws RouteNotFoundException {
 
         logger.info("getChargingSites() executing...");
-        distBtwnOneLngAtEachLat = buildListDistances(); // Result should already be cached.
         ArrayList<ChargingSite[]> listSitesUnfiltered = new ArrayList<>();
+        logger.info("Unfiltered list size : " + listSitesUnfiltered.size());
         /*
          * Initial defaults:
          *   distance = 1
@@ -74,7 +82,7 @@ public class RoutePlannerService {
             double latitude = routeCoords.get(i).getLat();
             double longitude = routeCoords.get(i).getLng();
 
-            // Queries the external API for this set of coordinates in an anonymous Runnable managed by ThreadPoolTaskExecutor
+            // Queries the external API for this set of coordinates in an anonymous Runnable managed by a ThreadPoolTaskExecutor
             // in order to speed up this method's response time.
             executor.execute(() -> {
                 logger.info("Querying...");
@@ -92,15 +100,26 @@ public class RoutePlannerService {
         }
 
         logger.info("Executor active count before blocking: " + executor.getActiveCount());
-        while (executor.getActiveCount() > 1) {
-            // Not an ideal solution if multiple calls to this API are occurring, but works for what I need for now.
+
+        // My crude solution for the case where active count = 0 but threads have not yet executed. Forces the "sites-get-x"
+        // thread to sleep very briefly in case no "ocm-query-x" thread is currently active. Seems to work.
+        if (executor.getActiveCount() == 0) {
+            try {
+                Thread.sleep(50l);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
+
+        // Blocks while threads are still executing. Edge case seemingly solved above.
+        while (executor.getActiveCount() > 0) {}
+
         logger.info("Executor active count after blocking: " + executor.getActiveCount());
         logger.info("Unfiltered list size: " + listSitesUnfiltered.size());
         ArrayList<ChargingSite> sitesFiltered = removeRepeatingElements(listSitesUnfiltered);
         logger.info("Filtered list size: " + sitesFiltered.size());
         logger.info("Returning result.");
-        return sitesFiltered;
+        return CompletableFuture.completedFuture(sitesFiltered);
     }
 
     /**
@@ -143,7 +162,7 @@ public class RoutePlannerService {
      * @param unit -- 1 = km, 2 = miles
      * @return the new smaller list of coordinates post-filtering
      */
-    private ArrayList<Location> filterLocationsByDistance(ArrayList<Location> locations, double distance, int unit) {
+    ArrayList<Location> filterLocationsByDistance(ArrayList<Location> locations, double distance, int unit) {
 
         ArrayList<Location> filteredLocations = new ArrayList<>();
         if (unit == 2)
@@ -190,6 +209,7 @@ public class RoutePlannerService {
 
     private double[] getMaxMinLngs(double lat, double lng, double distance) {
 
+        distBtwnOneLngAtEachLat = buildListDistances(); // Result should already be cached.
         double[] maxMinLats = getMaxMinLats(lat, distance);
         int nearestLatNorth = (int) (maxMinLats[0]);
         int nearestLatSouth = (int) (maxMinLats[1]);
@@ -252,7 +272,7 @@ public class RoutePlannerService {
      * @param sitesAlongRouteRepeatingElements -- the ArrayList of ChargingSite arrays
      * @return an ArrayList of sites along the route
      */
-    private ArrayList<ChargingSite> removeRepeatingElements(ArrayList<ChargingSite[]> sitesAlongRouteRepeatingElements) {
+    ArrayList<ChargingSite> removeRepeatingElements(ArrayList<ChargingSite[]> sitesAlongRouteRepeatingElements) {
 
         // the ArrayList that will be returned
         ArrayList<ChargingSite> sitesAlongRoute = new ArrayList();

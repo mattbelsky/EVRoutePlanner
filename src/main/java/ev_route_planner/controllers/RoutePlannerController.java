@@ -9,10 +9,14 @@ import ev_route_planner.model.open_charge_map.ChargingSite;
 import ev_route_planner.services.RoutePlannerService;
 import ev_route_planner.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Finds a list of EV charging sites along a specified route.
@@ -29,6 +33,10 @@ public class RoutePlannerController {
 
     @Autowired
     RoutePlannerMapper routePlannerMapper;
+
+    @Autowired
+    @Qualifier("chargingSites")
+    ThreadPoolTaskExecutor executor;
 
     @Value("${googlemaps.key}")
     String googleMapsApiKey;
@@ -78,7 +86,13 @@ public class RoutePlannerController {
 //        if (!userService.keyExists(apiKey)) throw new KeyDoesNotExistException();
 //        if (userService.apiCallsExceeded(apiKey)) throw new RateLimitException();
 
-        ArrayList<ChargingSite> sites = routePlannerService.getChargingSites(routeQueryData);
+        CompletableFuture<ArrayList<ChargingSite>> future = routePlannerService.getChargingSites(routeQueryData);
+        ArrayList<ChargingSite> sites = null;
+        try {
+            sites = future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
 
 //        // Increments the total number of API calls made
 //        userService.addApiCall(apiKey);
