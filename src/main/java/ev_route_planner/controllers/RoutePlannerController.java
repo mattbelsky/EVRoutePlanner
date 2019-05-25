@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import static ev_route_planner.Constants.CHARGING_SITES_EXECUTOR;
+
 /**
  * Finds a list of EV charging sites along a specified route.
  */
@@ -33,10 +35,6 @@ public class RoutePlannerController {
 
     @Autowired
     RoutePlannerMapper routePlannerMapper;
-
-    @Autowired
-    @Qualifier("chargingSites")
-    ThreadPoolTaskExecutor executor;
 
     @Value("${googlemaps.key}")
     String googleMapsApiKey;
