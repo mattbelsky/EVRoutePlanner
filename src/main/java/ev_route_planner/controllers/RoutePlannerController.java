@@ -3,15 +3,12 @@ package ev_route_planner.controllers;
 import ev_route_planner.exceptions.KeyDoesNotExistException;
 import ev_route_planner.exceptions.RateLimitException;
 import ev_route_planner.exceptions.RouteNotFoundException;
-import ev_route_planner.mappers.RoutePlannerMapper;
 import ev_route_planner.model.RouteQueryData;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import ev_route_planner.services.RoutePlannerService;
 import ev_route_planner.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -30,9 +27,6 @@ public class RoutePlannerController {
 
     @Autowired
     UserService userService;
-
-    @Autowired
-    RoutePlannerMapper routePlannerMapper;
 
     @Value("${googlemaps.key}")
     String googleMapsApiKey;
@@ -101,6 +95,7 @@ public class RoutePlannerController {
                                    @RequestParam("start_lng") double startLng,
                                    @RequestParam("end_lat") double endLat,
                                    @RequestParam("end_lng") double endLng) throws RouteNotFoundException {
+
         RouteQueryData routeQueryData = new RouteQueryData(
                 startLat,
                 startLng,

@@ -24,10 +24,10 @@ import static ev_route_planner.Constants.QUERY_EXECUTOR;
 @Service
 public class RoutePlannerService {
 
-    private static final int EARTH_RADIUS = 6371; // Approx Earth radius in KM
+    private static final int EARTH_RADIUS = 6371; // Approx Earth radius in km
     private static final int DISTANCE_ONE_DEGREE_LATITUDE = 111; // Approx distance between one degree difference in latitude in km.
 
-    double[] distBtwnOneLngAtEachLat;
+    double[] distBtwnOneLngAtEachLat; // The distance in km between 1 degree longitude at each degree latitude
     Logger logger = LoggerFactory.getLogger(RoutePlannerService.class);
 
     @Autowired
