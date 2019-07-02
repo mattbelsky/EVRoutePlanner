@@ -5,9 +5,15 @@ import ev_route_planner.model.geolocation.Geolocation;
 import ev_route_planner.model.geolocation.WifiAccessPoints;
 import ev_route_planner.model.open_charge_map.ChargingSite;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Arrays;
 
 @Service
 public class OpenChargeMapService {
@@ -68,7 +74,15 @@ public class OpenChargeMapService {
                 "&distanceunit=" + distanceUnit +
                 "&levelid=" + levelID +
                 "&maxresults=" + maxResults + "&compact=true&verbose=false";
-        return restTemplate.getForObject(fullQuery, ChargingSite[].class);
+
+        // Open Charge Map API requires a user agent in the request header as of June 2019.
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+        headers.add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36");
+        HttpEntity<String> entity = new HttpEntity<String>("parameters", headers);
+
+        return restTemplate.exchange(fullQuery, HttpMethod.GET, entity, ChargingSite[].class).getBody();
     }
 
     /**
